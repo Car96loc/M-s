@@ -355,6 +355,7 @@
             display: flex;
             align-items: center;
             gap: 24px;
+            margin-bottom: 20px; /* Añadimos margen inferior para espacio para el mensaje */
         }
         .control-button {
             background: none;
@@ -743,39 +744,23 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-        /* Mensaje de error */
-        .error-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(234, 67, 53, 0.9);
-            color: white;
-            padding: 12px 24px;
+        /* Mensaje de notificación */
+        .notification-message {
+            background-color: var(--background-tertiary);
+            color: var(--text-primary);
+            padding: 8px 16px;
             border-radius: 4px;
             font-size: 14px;
             display: none;
             z-index: 25;
+            box-shadow: var(--shadow-elevation-1);
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
-        .error-message.show {
+        .notification-message.show {
             display: block;
-        }
-        /* Mensaje de éxito */
-        .success-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(52, 168, 83, 0.9);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 4px;
-            font-size: 14px;
-            display: none;
-            z-index: 25;
-        }
-        .success-message.show {
-            display: block;
+            opacity: 1;
         }
         /* Indicador de carga adicional */
         .loading-more {
@@ -921,6 +906,9 @@
                         <span class="material-icons">repeat</span>
                     </button>
                 </div>
+                
+                <!-- Contenedor para el mensaje de notificación -->
+                <div class="notification-message" id="notificationMessage"></div>
             </div>
             
             <button class="share-button" id="shareButton">
@@ -960,14 +948,6 @@
             
             <div class="slide-area-left" id="slideAreaLeft"></div>
             <div class="slide-area-right" id="slideAreaRight"></div>
-            
-            <div class="error-message" id="errorMessage">
-                No se pudieron cargar las canciones. Inténtalo de nuevo.
-            </div>
-            
-            <div class="success-message" id="successMessage">
-                Canción agregada a favoritos correctamente.
-            </div>
         </div>
         
         <div class="favorites-dialog" id="favoritesDialog">
@@ -1032,8 +1012,6 @@
             const searchInput = document.getElementById('searchInput');
             const artistImageContainer = document.getElementById('artistImageContainer');
             const artistImage = document.getElementById('artistImage');
-            const errorMessage = document.getElementById('errorMessage');
-            const successMessage = document.getElementById('successMessage');
             const floatingCircles = document.getElementById('floatingCircles');
             const favoritesPanel = document.getElementById('favoritesPanel');
             const playerPanel = document.getElementById('playerPanel');
@@ -1066,6 +1044,9 @@
             const confirmMessage = document.getElementById('confirmMessage');
             const cancelConfirmButton = document.getElementById('cancelConfirmButton');
             const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+            
+            // Elemento para el mensaje de notificación
+            const notificationMessage = document.getElementById('notificationMessage');
             
             // Variables para el control
             let currentSongIndex = -1;
@@ -1546,7 +1527,7 @@
             
             function shareContent(platform) {
                 if (currentSongIndex === -1 || songs.length === 0) {
-                    showTemporaryMessage(errorMessage, "No hay ninguna canción para compartir.");
+                    showNotification("No hay ninguna canción para compartir.");
                     return;
                 }
                 
@@ -1566,14 +1547,14 @@
                         break;
                     case 'instagram':
                         copyToClipboard(shareUrl);
-                        showTemporaryMessage(errorMessage, "Enlace copiado al portapapeles. Pégalo en Instagram.");
+                        showNotification("Enlace copiado al portapapeles. Pégalo en Instagram.");
                         break;
                     case 'telegram':
                         window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank');
                         break;
                     case 'copy':
                         copyToClipboard(shareUrl);
-                        showTemporaryMessage(errorMessage, "Enlace copiado al portapapeles.");
+                        showNotification("Enlace copiado al portapapeles.");
                         break;
                     case 'more':
                         if (navigator.share) {
@@ -1586,17 +1567,18 @@
                             });
                         } else {
                             copyToClipboard(shareUrl);
-                            showTemporaryMessage(errorMessage, "Enlace copiado al portapapeles.");
+                            showNotification("Enlace copiado al portapapeles.");
                         }
                         break;
                 }
             }
             
-            function showTemporaryMessage(element, message) {
-                element.textContent = message;
-                element.classList.add('show');
+            function showNotification(message) {
+                notificationMessage.textContent = message;
+                notificationMessage.classList.add('show');
+                
                 setTimeout(() => {
-                    element.classList.remove('show');
+                    notificationMessage.classList.remove('show');
                 }, 3000);
             }
             
@@ -1617,7 +1599,7 @@
                 );
                 
                 if (isAlreadyInPlaylist) {
-                    showTemporaryMessage(errorMessage, "Esta canción ya está en la lista de favoritos.");
+                    showNotification("Esta canción ya está en la lista de favoritos.");
                     return;
                 }
                 
@@ -1630,7 +1612,7 @@
                     savePlaylists();
                 }
                 
-                showTemporaryMessage(successMessage, "Canción agregada a favoritos correctamente.");
+                showNotification("Canción agregada a favoritos correctamente.");
                 favoritesDialog.classList.remove('show');
             }
             
@@ -1751,7 +1733,7 @@
                             
                             // Mostrar diálogo de confirmación
                             confirmTitle.textContent = 'Eliminar canción';
-                            confirmMessage.textContent = `¿Estás seguro de que quieres eliminar "${song.title}" de la lista?`;
+                            confirmMessage.textContent = `¿Estás seguro de que quiere eliminar "${song.title}" de la lista?`;
                             confirmDialog.classList.add('show');
                         }, 800); // Aumentamos el tiempo para evitar activaciones accidentales
                         
@@ -1835,14 +1817,14 @@
                     songArtist.textContent = 'Selecciona otra canción';
                 }
                 
-                showTemporaryMessage(successMessage, "Canción eliminada de la lista correctamente.");
+                showNotification("Canción eliminada de la lista correctamente.");
             }
             
             function playPlaylist(playlistId) {
                 const playlistSongs = favorites[playlistId];
                 
                 if (playlistSongs.length === 0) {
-                    showTemporaryMessage(errorMessage, "Esta lista de favoritos está vacía.");
+                    showNotification("Esta lista de favoritos está vacía.");
                     return;
                 }
                 
@@ -1925,7 +1907,7 @@
             
             function onPlayerError(event) {
                 console.error("Error en el reproductor de YouTube:", event.data);
-                showTemporaryMessage(errorMessage, "Error al reproducir el video. Intenta con otra canción.");
+                showNotification("Error al reproducir el video. Intenta con otra canción.");
                 
                 const icon = playPauseButton.querySelector('.material-icons');
                 icon.textContent = 'play_arrow';
@@ -1969,13 +1951,16 @@
             function searchArtistOnYouTube(artistName) {
                 currentQuery = artistName;
                 nextPageToken = null;
-                searchResults = []; // Guardamos los resultados de búsqueda
+                searchResults = []; // Guardamos los resultados de búsqueda por separado
                 songs = [];
                 currentSongIndex = -1;
                 originalSongOrder = [];
                 
                 // Aumentar el número de resultados iniciales de 10 a 20
                 let searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(artistName + ' music')}&type=video&videoCategoryId=10&maxResults=20&key=${YOUTUBE_API_KEY}`;
+                
+                // Mostrar indicador de carga
+                showNotification("Buscando canciones...");
                 
                 fetch(searchUrl)
                     .then(response => {
@@ -2028,13 +2013,16 @@
                             progressFilled.style.width = '0%';
                             currentTime.textContent = '0:00';
                             totalTime.textContent = '0:00';
+                            
+                            // Ocultar notificación de carga
+                            notificationMessage.classList.remove('show');
                         } else {
                             throw new Error('No se encontraron videos en la respuesta');
                         }
                     })
                     .catch(error => {
                         console.error('Error al buscar en YouTube:', error);
-                        showTemporaryMessage(errorMessage, "No se encontraron resultados. Intenta con otra búsqueda.");
+                        showNotification("No se encontraron resultados. Intenta con otra búsqueda.");
                     });
             }
             
@@ -2092,7 +2080,7 @@
                     })
                     .catch(error => {
                         console.error('Error al cargar más canciones:', error);
-                        showTemporaryMessage(errorMessage, "Error al cargar más canciones. Inténtalo de nuevo.");
+                        showNotification("Error al cargar más canciones. Inténtalo de nuevo.");
                     })
                     .finally(() => {
                         isLoading = false;
@@ -2245,7 +2233,7 @@
                 if (selectedPlaylistId && selectedSongForFavorite) {
                     addToFavorites(selectedPlaylistId);
                 } else {
-                    showTemporaryMessage(errorMessage, "Selecciona una lista antes de agregar.");
+                    showNotification("Selecciona una lista antes de agregar.");
                 }
             });
             
@@ -2287,10 +2275,10 @@
                     savePlaylists();
                     updatePlaylistsList(playlistsContainer);
                     updatePlaylistsList(playPlaylistsContainer);
-                    showTemporaryMessage(successMessage, `Lista "${newPlaylist.name}" creada.`);
+                    showNotification(`Lista "${newPlaylist.name}" creada.`);
                     createPlaylistDialog.classList.remove('show');
                 } else {
-                    showTemporaryMessage(errorMessage, "El nombre de la lista no puede estar vacío.");
+                    showNotification("El nombre de la lista no puede estar vacío.");
                 }
             });
             
@@ -2310,10 +2298,10 @@
                         savePlaylists();
                         updatePlaylistsList(playlistsContainer);
                         updatePlaylistsList(playPlaylistsContainer);
-                        showTemporaryMessage(successMessage, `Lista "${newPlaylist.name}" creada.`);
+                        showNotification(`Lista "${newPlaylist.name}" creada.`);
                         createPlaylistDialog.classList.remove('show');
                     } else {
-                        showTemporaryMessage(errorMessage, "El nombre de la lista no puede estar vacío.");
+                        showNotification("El nombre de la lista no puede estar vacío.");
                     }
                 }
             });
