@@ -552,6 +552,74 @@
         .add-button:hover {
             background-color: var(--primary-hover);
         }
+        /* Diálogo para crear nueva lista */
+        .create-playlist-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--background-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-elevation-3);
+            padding: 24px;
+            min-width: 320px;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+        }
+        .create-playlist-dialog.show {
+            display: flex;
+        }
+        .input-container {
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        .playlist-input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: var(--background-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition-standard);
+        }
+        .playlist-input:focus {
+            border-color: var(--primary-color);
+        }
+        /* Diálogo para confirmar eliminación */
+        .confirm-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--background-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-elevation-3);
+            padding: 24px;
+            min-width: 320px;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+        }
+        .confirm-dialog.show {
+            display: flex;
+        }
+        .confirm-message {
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
         /* Reproductor de YouTube */
         .youtube-player {
             position: absolute;
@@ -778,7 +846,7 @@
                 min-width: 200px;
             }
             
-            .favorites-dialog {
+            .favorites-dialog, .create-playlist-dialog, .confirm-dialog {
                 min-width: 280px;
                 padding: 20px;
             }
@@ -916,6 +984,26 @@
             </div>
         </div>
         
+        <div class="create-playlist-dialog" id="createPlaylistDialog">
+            <div class="dialog-title">Crear nueva lista</div>
+            <div class="input-container">
+                <input type="text" class="playlist-input" id="playlistInput" placeholder="Nombre de la lista">
+            </div>
+            <div class="dialog-actions">
+                <button class="dialog-button cancel-button" id="cancelCreateButton">Cancelar</button>
+                <button class="dialog-button add-button" id="confirmCreateButton">Crear</button>
+            </div>
+        </div>
+        
+        <div class="confirm-dialog" id="confirmDialog">
+            <div class="confirm-title" id="confirmTitle">Confirmar eliminación</div>
+            <div class="confirm-message" id="confirmMessage">¿Estás seguro de que quieres eliminar esta canción?</div>
+            <div class="dialog-actions">
+                <button class="dialog-button cancel-button" id="cancelConfirmButton">Cancelar</button>
+                <button class="dialog-button add-button" id="confirmDeleteButton">Eliminar</button>
+            </div>
+        </div>
+        
         <div class="favorites-dialog" id="playFavoritesDialog">
             <div class="dialog-title">Seleccionar lista para reproducir</div>
             <div class="playlists-container" id="playPlaylistsContainer">
@@ -967,6 +1055,18 @@
             const cancelPlayButton = document.getElementById('cancelPlayButton');
             const playSelectedButton = document.getElementById('playSelectedButton');
             
+            // Nuevos elementos para los diálogos personalizados
+            const createPlaylistDialog = document.getElementById('createPlaylistDialog');
+            const playlistInput = document.getElementById('playlistInput');
+            const cancelCreateButton = document.getElementById('cancelCreateButton');
+            const confirmCreateButton = document.getElementById('confirmCreateButton');
+            
+            const confirmDialog = document.getElementById('confirmDialog');
+            const confirmTitle = document.getElementById('confirmTitle');
+            const confirmMessage = document.getElementById('confirmMessage');
+            const cancelConfirmButton = document.getElementById('cancelConfirmButton');
+            const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+            
             // Variables para el control
             let currentSongIndex = -1;
             let isPlaying = false;
@@ -992,9 +1092,11 @@
             let favorites = {};
             let currentPlaylistId = null;
             let isDraggingProgress = false;
+            let songToDelete = null;
+            let playlistToDeleteFrom = null;
             
-            // API Key de YouTube
-            const YOUTUBE_API_KEY = 'AIzaSyDnKSv_G-UTL5taK1fsm6GKAkUXy9eTQE8';
+            // API Key de YouTube actualizada
+            const YOUTUBE_API_KEY = 'AIzaSyB8iqjANeG1XA5svT6D5ejzuuVeaA_HFkc';
             
             // Inicializar listas de reproducción predeterminadas
             function initializePlaylists() {
@@ -1312,7 +1414,7 @@
                 
                 let nextIndex;
                 if (isShuffleOn) {
-                    nextIndex = Math.floor(Math.random() * songs.length);
+                    nextIndex = Math.floor(Math.random() % songs.length);
                 } else {
                     nextIndex = currentSongIndex < songs.length - 1 ? currentSongIndex + 1 : 0;
                 }
@@ -1325,7 +1427,7 @@
                 
                 let prevIndex;
                 if (isShuffleOn) {
-                    prevIndex = Math.floor(Math.random() * songs.length);
+                    prevIndex = Math.floor(Math.random() % songs.length);
                 } else {
                     prevIndex = currentSongIndex > 0 ? currentSongIndex - 1 : songs.length - 1;
                 }
@@ -1602,13 +1704,14 @@
                             // Añadir clase para animación
                             this.classList.add('deleting');
                             
-                            // Mostrar confirmación para eliminar
-                            if (confirm(`¿Eliminar "${song.title}" de la lista?`)) {
-                                removeSongFromPlaylist(playlistId, index);
-                            } else {
-                                // Quitar clase de animación si se cancela
-                                this.classList.remove('deleting');
-                            }
+                            // Guardar la información de la canción a eliminar
+                            songToDelete = index;
+                            playlistToDeleteFrom = playlistId;
+                            
+                            // Mostrar diálogo de confirmación
+                            confirmTitle.textContent = 'Eliminar canción';
+                            confirmMessage.textContent = `¿Estás seguro de que quieres eliminar "${song.title}" de la lista?`;
+                            confirmDialog.classList.add('show');
                         }, 800); // Aumentamos el tiempo para evitar activaciones accidentales
                         
                         // Prevenir el menú contextual
@@ -1642,13 +1745,14 @@
                             // Añadir clase para animación
                             this.classList.add('deleting');
                             
-                            // Mostrar confirmación para eliminar
-                            if (confirm(`¿Eliminar "${song.title}" de la lista?`)) {
-                                removeSongFromPlaylist(playlistId, index);
-                            } else {
-                                // Quitar clase de animación si se cancela
-                                this.classList.remove('deleting');
-                            }
+                            // Guardar la información de la canción a eliminar
+                            songToDelete = index;
+                            playlistToDeleteFrom = playlistId;
+                            
+                            // Mostrar diálogo de confirmación
+                            confirmTitle.textContent = 'Eliminar canción';
+                            confirmMessage.textContent = `¿Estás seguro de que quieres eliminar "${song.title}" de la lista?`;
+                            confirmDialog.classList.add('show');
                         }, 800); // Aumentamos el tiempo para evitar activaciones accidentales
                         
                         // Prevenir el menú contextual
@@ -2155,13 +2259,26 @@
                 }
             });
             
-            // Corregir el evento para crear una nueva lista
+            // Eventos para el diálogo de crear nueva lista
             createPlaylistButton.addEventListener('click', function() {
-                const playlistName = prompt('Nombre de la nueva lista:');
-                if (playlistName && playlistName.trim()) {
+                playlistInput.value = '';
+                createPlaylistDialog.classList.add('show');
+                // Enfocar el input después de mostrar el diálogo
+                setTimeout(() => {
+                    playlistInput.focus();
+                }, 100);
+            });
+            
+            cancelCreateButton.addEventListener('click', function() {
+                createPlaylistDialog.classList.remove('show');
+            });
+            
+            confirmCreateButton.addEventListener('click', function() {
+                const playlistName = playlistInput.value.trim();
+                if (playlistName) {
                     const newPlaylist = {
                         id: 'playlist' + Date.now(),
-                        name: playlistName.trim(),
+                        name: playlistName,
                         icon: 'playlist_add',
                         playlistSongs: []
                     };
@@ -2171,6 +2288,62 @@
                     updatePlaylistsList(playlistsContainer);
                     updatePlaylistsList(playPlaylistsContainer);
                     showTemporaryMessage(successMessage, `Lista "${newPlaylist.name}" creada.`);
+                    createPlaylistDialog.classList.remove('show');
+                } else {
+                    showTemporaryMessage(errorMessage, "El nombre de la lista no puede estar vacío.");
+                }
+            });
+            
+            // Permitir crear lista con Enter
+            playlistInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const playlistName = this.value.trim();
+                    if (playlistName) {
+                        const newPlaylist = {
+                            id: 'playlist' + Date.now(),
+                            name: playlistName,
+                            icon: 'playlist_add',
+                            playlistSongs: []
+                        };
+                        playlists.push(newPlaylist);
+                        favorites[newPlaylist.id] = newPlaylist.playlistSongs;
+                        savePlaylists();
+                        updatePlaylistsList(playlistsContainer);
+                        updatePlaylistsList(playPlaylistsContainer);
+                        showTemporaryMessage(successMessage, `Lista "${newPlaylist.name}" creada.`);
+                        createPlaylistDialog.classList.remove('show');
+                    } else {
+                        showTemporaryMessage(errorMessage, "El nombre de la lista no puede estar vacío.");
+                    }
+                }
+            });
+            
+            // Eventos para el diálogo de confirmación de eliminación
+            cancelConfirmButton.addEventListener('click', function() {
+                // Quitar la clase de eliminación de la canción
+                const songItems = document.querySelectorAll('.favorite-song-item');
+                if (songItems[songToDelete]) {
+                    songItems[songToDelete].classList.remove('deleting');
+                }
+                
+                confirmDialog.classList.remove('show');
+                songToDelete = null;
+                playlistToDeleteFrom = null;
+            });
+            
+            confirmDeleteButton.addEventListener('click', function() {
+                if (songToDelete !== null && playlistToDeleteFrom !== null) {
+                    removeSongFromPlaylist(playlistToDeleteFrom, songToDelete);
+                    
+                    // Quitar la clase de eliminación de la canción
+                    const songItems = document.querySelectorAll('.favorite-song-item');
+                    if (songItems[songToDelete]) {
+                        songItems[songToDelete].classList.remove('deleting');
+                    }
+                    
+                    confirmDialog.classList.remove('show');
+                    songToDelete = null;
+                    playlistToDeleteFrom = null;
                 }
             });
             
